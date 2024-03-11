@@ -29,6 +29,7 @@ mod number;
 mod os;
 mod path;
 mod process;
+mod runtime;
 mod security;
 mod stream;
 mod test_utils;
@@ -39,7 +40,7 @@ mod vm;
 mod xml;
 
 use minimal_tracer::MinimalTracer;
-use rquickjs::{AsyncContext, Module};
+use rquickjs::{async_with, AsyncContext, CatchResultExt, Module};
 use std::{
     env,
     error::Error,
@@ -133,11 +134,14 @@ Options:
 }
 
 async fn start_runtime(context: &AsyncContext) {
-    Vm::run_and_handle_exceptions(context, |ctx| {
-        Module::import(&ctx, "@llrt/runtime")?;
-        Ok(())
-    })
-    .await
+    async_with! ( context => |ctx|{
+            crate::runtime::runtime(&ctx)
+                .await
+                .catch(&ctx)
+                .unwrap_or_else(|err| Vm::print_error_and_exit(&ctx, err));
+        }
+    )
+    .await;
 }
 
 async fn start_cli(context: &AsyncContext) {
